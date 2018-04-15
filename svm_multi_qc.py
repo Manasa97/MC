@@ -8,6 +8,7 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score
+import pickle
 
 train = pd.read_csv("train.csv")
 test = pd.read_csv("qaps_2000_cleaned.csv")
@@ -20,16 +21,29 @@ pipeline = Pipeline([
     ('tfidf',              TfidfTransformer()),
     ('classifier',         OneVsRestClassifier(LinearSVC()))
 ])
+'''
+CountVectorizer() - gets the vocabulary
+TfidfTransformer converts words to frequencies
 
-test_example = ['Who killed Abraham Lincoln?']
+'''
+test_example = ['how many apples?']
 
-
+#Binarise labels in a one vs all fashion
 lb = LabelBinarizer()
+#transform binary targets to a column vector eg.([yes,no,no]) -> [1,0,0]
 z = lb.fit_transform(train["coarse"])
 
 pipeline.fit(train["text"], z)
-predicted = pipeline.predict(test["text"])
-predicted_example = pipeline.predict(test_example)
+
+pickled_file = "SVM_pipeline.txt"
+pickle.dump(pipeline, open(pickled_file,'wb'))
+pickle.dump(lb, open("lb_pickled_file.txt",'wb'))
+
+pipeline1 = pickle.load(open(pickled_file,'rb'))
+predicted = pipeline1.predict(test["text"])
+predicted_example = pipeline1.predict(test_example)
+
+#Turn labels back into original multi-class
 predictions = lb.inverse_transform(predicted)
 predictions_example = lb.inverse_transform(predicted_example)
 print(len(predictions))
