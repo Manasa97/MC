@@ -7,6 +7,9 @@ import json
 import math
 import string
 import operator
+import pickle
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.pipeline import Pipeline
 from collections import defaultdict
 from collections import OrderedDict
 from collections import Counter
@@ -44,10 +47,16 @@ def pipeline(document):
     """
     # init classes
 
+    
+    
     ss = SentenceSelection()
     gs = GapSelection()
     fc = FeatureConstruction()
+    st = StanfordNERTagger('/Users/Manasa/Desktop/nlpmodel/stanford-models/' + 'english.muc.7class.distsim.crf.ser.gz')
+    
+
     # build candidate questions, extract features
+    
     sentences = ss.prepare_sentences(document)
     candidates = gs.get_candidates(sentences)
     candidates_with_features = fc.extract_feature(candidates)
@@ -63,6 +72,7 @@ def pipeline(document):
         i = int(input("Press 1 to continue, 0 to stop"))
     #return matched_answer
     #return question_answers
+    
 
 
 def computeSimilarity(query, question_answers):
@@ -71,7 +81,8 @@ def computeSimilarity(query, question_answers):
     #query = input('Enter your question: ').strip()
     print(query)
     simDict = {}
-    
+    query.replace('which','what')
+    query.replace('Which','What')
     for i in range(question_answers.shape[0]):
         if question_answers.iloc[i]['Prediction'] != 0:
             q = question_answers.iloc[i]['Question']
@@ -116,29 +127,37 @@ def _classify(df):
 
 def replaceGaps(question_answers):
 
-	
-	replacements = {'PERSON':'who', 'LOCATION':'where','O':'what'}
-	st = StanfordNERTagger(os.environ.get(
-            'STANFORD_JARS') + 'english.all.3class.distsim.crf.ser.gz')
+    print('Replacing gaps in questions')
+    replacements = {'PERSON':'who', 'LOCATION':'where','O':'what','DATE':'when','PERCENT':'how much','TIME':'when','MONEY':'how much'}
+    st7 = StanfordNERTagger(os.environ.get(
+    'STANFORD_JARS') + 'english.muc.7class.distsim.crf.ser.gz')
+    st3 = StanfordNERTagger(os.environ.get(
+    'STANFORD_JARS') + 'english.all.3class.distsim.crf.ser.gz')
+    for i in range(question_answers.shape[0]):
+        a = question_answers.iloc[i]['Answer']
+        q = question_answers.iloc[i]['Question']
+        ner = st3.tag(a.split())
+        ner = [list(elem) for elem in ner]
+        
 
-	for i in range(question_answers.shape[0]):
-		a = question_answers.iloc[i]['Answer']
-		q = question_answers.iloc[i]['Question']
-		ner = st.tag(a.split())
-		
-		#Take majority tag for now excluding 0s
-		tags = [i[1] for i in ner]
-		t = [a for a in tags if a != 'O']
-		if t is not None and len(t) != 0:
-			c = Counter(t)
-			majority_tag = c.most_common(1)[0][0]
-		else:
-			majority_tag = 'O'
+        for j in ner:
+            if j[1] == 'O':
+                j[1] = st7.tag(j[0].split())[0][1]
 
-		q = q.replace('_',replacements[majority_tag],1)
-		q = q.replace('_','')
-		question_answers.at[i,'Question'] = q
-	return question_answers
+        
+        #Take majority tag for now excluding 0s
+        tags = [x[1] for x in ner]
+        t = [a for a in tags if a != 'O']
+        if t is not None and len(t) != 0:
+            c = Counter(t)
+            majority_tag = c.most_common(1)[0][0]
+        else:
+            majority_tag = 'O'
+
+        q = q.replace('_',replacements[majority_tag],1)
+        q = q.replace('_','')
+        question_answers.at[i,'Question'] = q
+    return question_answers
 
 
 	
